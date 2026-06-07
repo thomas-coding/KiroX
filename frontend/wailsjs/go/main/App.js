@@ -34,6 +34,10 @@ export function DeleteKiroCliAccount(arg1) {
   return window['go']['main']['App']['DeleteKiroCliAccount'](arg1);
 }
 
+export function DeleteKiroGatewayAccount(arg1) {
+  return window['go']['main']['App']['DeleteKiroGatewayAccount'](arg1);
+}
+
 export function DeleteOutlookAccount(arg1) {
   return window['go']['main']['App']['DeleteOutlookAccount'](arg1);
 }
@@ -54,12 +58,20 @@ export function DownloadUpdate() {
   return window['go']['main']['App']['DownloadUpdate']();
 }
 
+export function ExportKiroGatewayAccount(arg1) {
+  return window['go']['main']['App']['ExportKiroGatewayAccount'](arg1);
+}
+
 export function GetCloudMailConfigs() {
   return window['go']['main']['App']['GetCloudMailConfigs']();
 }
 
 export function GetDataDir() {
   return window['go']['main']['App']['GetDataDir']();
+}
+
+export function GetKiroGatewayStatus() {
+  return window['go']['main']['App']['GetKiroGatewayStatus']();
 }
 
 export function GetLanguage() {
@@ -130,6 +142,14 @@ export function KiroCliStartCommand() {
   return window['go']['main']['App']['KiroCliStartCommand']();
 }
 
+export function KiroGatewayChatSmokeTest(arg1) {
+  return window['go']['main']['App']['KiroGatewayChatSmokeTest'](arg1);
+}
+
+export function KiroGatewayExportDir() {
+  return window['go']['main']['App']['KiroGatewayExportDir']();
+}
+
 export function ListProxyPool() {
   return window['go']['main']['App']['ListProxyPool']();
 }
@@ -170,6 +190,10 @@ export function ResetResultOutputDir() {
   return window['go']['main']['App']['ResetResultOutputDir']();
 }
 
+export function RestartKiroGateway() {
+  return window['go']['main']['App']['RestartKiroGateway']();
+}
+
 export function SaveCloudMailConfigs(arg1) {
   return window['go']['main']['App']['SaveCloudMailConfigs'](arg1);
 }
@@ -188,6 +212,10 @@ export function SelectOutlookFile() {
 
 export function SetDataDir(arg1) {
   return window['go']['main']['App']['SetDataDir'](arg1);
+}
+
+export function SetKiroAccountLifecycle(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetKiroAccountLifecycle'](arg1, arg2, arg3);
 }
 
 export function SetLanguage(arg1) {
@@ -224,6 +252,10 @@ export function TestProxyEntry(arg1) {
 
 export function UpdateProxyEntry(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['UpdateProxyEntry'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function UploadKiroGatewayAccount(arg1) {
+  return window['go']['main']['App']['UploadKiroGatewayAccount'](arg1);
 }
 
 export function VerifyLicense(arg1) {

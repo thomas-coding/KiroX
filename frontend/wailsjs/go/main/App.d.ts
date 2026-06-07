@@ -20,6 +20,8 @@ export function ClearRegisteredOutlookAccounts():Promise<Record<string, any>>;
 
 export function DeleteKiroCliAccount(arg1:string):Promise<Record<string, any>>;
 
+export function DeleteKiroGatewayAccount(arg1:string):Promise<Record<string, any>>;
+
 export function DeleteOutlookAccount(arg1:string):Promise<Record<string, any>>;
 
 export function DeleteProxyEntry(arg1:string):Promise<Record<string, any>>;
@@ -30,9 +32,13 @@ export function DetectProxy(arg1:string):Promise<proxy.Info>;
 
 export function DownloadUpdate():Promise<Record<string, any>>;
 
+export function ExportKiroGatewayAccount(arg1:string):Promise<Record<string, any>>;
+
 export function GetCloudMailConfigs():Promise<Array<email.CloudMailConfig>>;
 
 export function GetDataDir():Promise<string>;
+
+export function GetKiroGatewayStatus():Promise<Record<string, any>>;
 
 export function GetLanguage():Promise<string>;
 
@@ -68,6 +74,10 @@ export function ImportOutlookFile(arg1:string):Promise<Record<string, any>>;
 
 export function KiroCliStartCommand():Promise<string>;
 
+export function KiroGatewayChatSmokeTest(arg1:string):Promise<Record<string, any>>;
+
+export function KiroGatewayExportDir():Promise<string>;
+
 export function ListProxyPool():Promise<Array<proxy.PoolEntry>>;
 
 export function LoadKiroCliAccounts():Promise<Record<string, any>>;
@@ -88,6 +98,8 @@ export function ResetProxy():Promise<Record<string, any>>;
 
 export function ResetResultOutputDir():Promise<Record<string, any>>;
 
+export function RestartKiroGateway():Promise<Record<string, any>>;
+
 export function SaveCloudMailConfigs(arg1:string):Promise<Record<string, any>>;
 
 export function SaveMoeMailConfigs(arg1:string):Promise<Record<string, any>>;
@@ -97,6 +109,8 @@ export function SelectDirectory():Promise<string>;
 export function SelectOutlookFile():Promise<string>;
 
 export function SetDataDir(arg1:string):Promise<Record<string, any>>;
+
+export function SetKiroAccountLifecycle(arg1:string,arg2:string,arg3:string):Promise<Record<string, any>>;
 
 export function SetLanguage(arg1:string):Promise<Record<string, any>>;
 
@@ -115,5 +129,7 @@ export function TestMoeMailConnection(arg1:string):Promise<Record<string, any>>;
 export function TestProxyEntry(arg1:string):Promise<proxy.Info>;
 
 export function UpdateProxyEntry(arg1:string,arg2:string,arg3:string,arg4:number,arg5:boolean):Promise<Record<string, any>>;
+
+export function UploadKiroGatewayAccount(arg1:string):Promise<Record<string, any>>;
 
 export function VerifyLicense(arg1:string):Promise<Record<string, any>>;

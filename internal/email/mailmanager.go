@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"reg_go/internal/storage"
 )
 
 const (
@@ -28,6 +29,22 @@ type MailManagerConfig struct {
 	URL      string `json:"url"`
 	APIKey   string `json:"apiKey"`
 	Provider string `json:"provider"`
+}
+
+func loadLocalMailManagerConfig() MailManagerConfig {
+	path := storage.GetDefaultDataDir() + string(os.PathSeparator) + "mail-manager.local.json"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return MailManagerConfig{}
+	}
+	var cfg MailManagerConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return MailManagerConfig{}
+	}
+	cfg.URL = strings.TrimSpace(cfg.URL)
+	cfg.APIKey = strings.TrimSpace(cfg.APIKey)
+	cfg.Provider = strings.TrimSpace(cfg.Provider)
+	return cfg
 }
 
 // MailManagerProvider 通过 Mail Manage 租约邮箱并等待 Kiro OTP。
@@ -76,20 +93,30 @@ func NewMailManagerProviderWithContext(ctx context.Context, provider string, tas
 
 // NewMailManagerProviderWithConfig 创建 Mail Manage provider 并立即 lease 一个邮箱。
 func NewMailManagerProviderWithConfig(ctx context.Context, config MailManagerConfig, taskIndex int) (*MailManagerProvider, error) {
+	localCfg := loadLocalMailManagerConfig()
 	if config.URL == "" {
 		config.URL = os.Getenv("KIROX_MAIL_MANAGER_URL")
 		if config.URL == "" {
-			config.URL = DefaultMailManagerURL
+			config.URL = localCfg.URL
+			if config.URL == "" {
+				config.URL = DefaultMailManagerURL
+			}
 		}
 	}
 	if config.APIKey == "" {
 		config.APIKey = os.Getenv("KIROX_MAIL_MANAGER_API_KEY")
+		if config.APIKey == "" {
+			config.APIKey = localCfg.APIKey
+		}
 	}
 	if config.Provider == "" {
-		config.Provider = "hotmail"
+		config.Provider = localCfg.Provider
+		if config.Provider == "" {
+			config.Provider = "hotmail"
+		}
 	}
 	if config.APIKey == "" {
-		return nil, fmt.Errorf("Mail Manager API key 未配置，请设置 KIROX_MAIL_MANAGER_API_KEY")
+		return nil, fmt.Errorf("Mail Manager API key 未配置，请设置 KIROX_MAIL_MANAGER_API_KEY 或 %s", storage.GetDefaultDataDir()+string(os.PathSeparator)+"mail-manager.local.json")
 	}
 	if !IsValidMailManagerProvider(config.Provider) {
 		return nil, fmt.Errorf("不支持的 Mail Manager 邮箱类型: %s", config.Provider)

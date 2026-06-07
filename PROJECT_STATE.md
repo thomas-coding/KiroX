@@ -4,62 +4,71 @@
 
 - Branch: `main`
 - Remote: `origin https://github.com/thomas-coding/KiroX.git`
-- Latest known base commit before this work: `1f570eb release: v1.0.3 - 多代理池 + 指纹按代理缓存 + Cloud-Mail/MoeMail 强制测试`
-- Working tree expected after this handoff: clean after commit/push.
+- Last completed work: Kiro account lifecycle UI, Gateway panel, Mail Manager local config fallback.
+- Working tree target: clean after commit/push.
 
 ## Done Recently
 
-- Added Kiro CLI account management UI and backend helpers.
-  - Files: `kiro_cli.go`, `frontend/js/kiro_cli.js`, `process_windows.go`, `process_other.go`.
-  - Supports account listing, real chat precheck before import, import into official Kiro CLI auth DB, delete suspended accounts, custom confirm modal, and persistent account log at `<dataDir>/kiro-cli-account.log`.
-- Added Mail Manager email provider for Kiro registration.
-  - Files: `internal/email/mailmanager.go`, `internal/task/coordinator.go`, `internal/core/config.go`, `internal/core/registrar.go`, `internal/core/signup_flow.go`, `frontend/index.html`, `frontend/js/ui.js`, `frontend/js/app.js`, `frontend/js/i18n.js`.
-  - UI exposes only provider type: `hotmail`, `icloud`, `cf_gmail`, `manual`.
-  - Backend uses `project=kiro`, parser `kiro_otp`, validates provider type, records `sent_after_unix` before send-otp, binds long OTP wait to task context, and marks failed leases on failure/cancel.
-- Added persistent registration logs.
-  - Path: `<dataDir>/kiro-register.log`.
-  - Running-log page has a "复制日志路径" button via `GetRegisterLogPath`.
-- Fixed Windows console popups for helper processes and app icon packaging.
-- Build/test passed before handoff:
-  - `go test ./...`
-  - `node --check frontend/js/task.js frontend/js/i18n.js`
-  - `npm run build`
-  - `wails build`
+- Reworked Kiro account management into a lifecycle page.
+  - Files: `kiro_cli.go`, `frontend/js/kiro_cli.js`, `frontend/index.html`, `frontend/css/style.css`.
+  - Tracks local lifecycle in `<dataDir>/kiro-account-state.json`.
+  - Supports precheck, Gateway JSON generation, upload to Gateway, local CLI import, mark limited/suspended/retired, delete, and persistent account logs.
+  - Gateway JSON output directory: `<dataDir>/kiro-gateway-accounts`.
+- Added remote Kiro Gateway panel.
+  - Files: `kiro_gateway.go`, `frontend/js/kiro_gateway.js`.
+  - Reads private server config from `C:\Users\wujin\.codex\kiro_servers.local.json`.
+  - Shows health, container status, remote account JSON files, per-account failures, and request stats.
+  - Reads stats from configured host state path first, then falls back to container `/app/state.json`.
+  - Supports remote JSON delete, Gateway restart, and chat smoke test.
+- Added one-click Gateway upload from the local lifecycle page.
+  - Upload uses `pscp`, restarts the configured Gateway container, and marks local lifecycle `gateway_uploaded`.
+  - Server credentials remain outside the repo.
+- Added Mail Manager local private config fallback.
+  - File: `internal/email/mailmanager.go`.
+  - Resolution order: explicit config, `KIROX_MAIL_MANAGER_*` env vars, `%APPDATA%\kirox\mail-manager.local.json`, then default URL.
+  - API key is not committed.
+- Increased Wails default window size.
+  - Default: `1280x820`; minimum: `1100x680`.
 
-## Configuration
+## Local Runtime State
 
-- Mail Manager base URL defaults to `http://43.162.94.131:8097`.
-- Mail Manager API key is not committed. Runtime must set:
-  - `KIROX_MAIL_MANAGER_API_KEY`
-  - Optional override: `KIROX_MAIL_MANAGER_URL`
-- Registration output defaults to `storage.GetResultOutputDir()`; app data uses `storage.GetDataDir()`.
+- Kiro registration logs: `<dataDir>/kiro-register.log`.
+- Kiro account logs: `<dataDir>/kiro-cli-account.log`.
+- Local lifecycle state: `<dataDir>/kiro-account-state.json`.
+- Local Gateway JSON output: `<dataDir>/kiro-gateway-accounts`.
+- Private Mail Manager config on this machine: `%APPDATA%\kirox\mail-manager.local.json`.
+- Private old-server config on this machine: `C:\Users\wujin\.codex\kiro_servers.local.json`.
 
-## Observed Test Result
+## Observed Results
 
-- Recent Mail Manager runs did lease mailboxes successfully:
-  - `rudzikfusch7152@hotmail.com`
-  - `11.layer_midsole@icloud.com`
-- Both failed before email submission at `[1] OIDC 注册` due to proxy `504 Gateway Timeout`.
-- The issue was proxy/network, not Mail Manager or OTP.
+- `11.layer_midsole@icloud.com` is uploaded on Gateway and has nonzero request stats.
+- `DarrellJohnson2520@outlook.pt` precheck, Gateway JSON export, Gateway upload, and container restart completed successfully.
+- Latest Mail Manager failure at `2026-06-07 16:04:21` was caused by missing runtime API key; local private config fallback was added and local config was created afterward.
 
 ## Risks
 
-- Mail Manager early failures currently call `/fail`, not `/release`, even when failure occurs before submitting email to Kiro. This avoids dangling active leases but may cool down the mailbox depending on server policy.
-- Retry currently reuses the same proxy within one task. A proxy 504 repeats on retry unless a new task picks another proxy.
-- `go.mod` now uses `go 1.25.0` after dependency changes including `modernc.org/sqlite`; do not revert unless toolchain compatibility requires it.
+- Remote Gateway delete only removes the server JSON; it does not remove the local KiroX account.
+- Local KiroX account delete removes local lifecycle and local Gateway JSON, but it does not remove remote Gateway JSON.
+- Manually uploaded legacy Gateway JSON may not include `email`; the Gateway panel can still show it by file name.
+- Mail Manager early failures currently call `/fail`, not `/release`, even when failure occurs before submitting email to Kiro.
+
+## Verification
+
+- `go test ./...`
+- `npm run build`
+- `wails build`
 
 ## Next Step
 
-- For next registration test, ensure `KIROX_MAIL_MANAGER_API_KEY` is set in the environment that launches `kirox.exe`, then test with a different proxy or direct connection.
-- If mailbox reuse matters, consider changing pre-email-submit failures from Mail Manager `/fail` to `/release`.
+- After pulling fresh code, launch `build/bin/kirox.exe`, use Gateway panel `刷新状态`, and confirm request stats load from `/app/state.json` fallback.
+- For future account replacement: register account, precheck, generate Gateway JSON, upload Gateway, then verify on Gateway panel.
 
 ## First Files To Read
 
 - `PROJECT_STATE.md`
-- `internal/email/mailmanager.go`
-- `internal/task/coordinator.go`
-- `app.go`
 - `kiro_cli.go`
-- `frontend/js/app.js`
-- `frontend/js/ui.js`
-- `frontend/js/task.js`
+- `kiro_gateway.go`
+- `internal/email/mailmanager.go`
+- `frontend/js/kiro_cli.js`
+- `frontend/js/kiro_gateway.js`
+- `frontend/index.html`

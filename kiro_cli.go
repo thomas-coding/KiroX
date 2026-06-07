@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,8 @@ const (
 )
 
 var kiroCliLogMu sync.Mutex
+var kiroAccountStateMu sync.Mutex
+var kiroCliAuthMu sync.Mutex
 
 type kiroCliAccount struct {
 	Email        string `json:"email"`
@@ -49,6 +52,20 @@ type kiroCliToken struct {
 	ExpiresIn    int64
 }
 
+type kiroAccountLifecycle struct {
+	Email               string `json:"email"`
+	Status              string `json:"status"`
+	Note                string `json:"note,omitempty"`
+	ProfileArn          string `json:"profileArn,omitempty"`
+	GatewayFile         string `json:"gatewayFile,omitempty"`
+	LastPrecheckAt      string `json:"lastPrecheckAt,omitempty"`
+	LastGatewayExportAt string `json:"lastGatewayExportAt,omitempty"`
+	LastGatewayUploadAt string `json:"lastGatewayUploadAt,omitempty"`
+	LastCliImportAt     string `json:"lastCliImportAt,omitempty"`
+	LastError           string `json:"lastError,omitempty"`
+	UpdatedAt           string `json:"updatedAt"`
+}
+
 func kiroCliLog(action, email, stage, message string) {
 	if email == "" {
 		email = "<unknown>"
@@ -60,6 +77,115 @@ func kiroCliLog(action, email, stage, message string) {
 
 func kiroCliLogPath() string {
 	return filepath.Join(storage.GetDataDir(), "kiro-cli-account.log")
+}
+
+func kiroAccountStatePath() string {
+	return filepath.Join(storage.GetDataDir(), "kiro-account-state.json")
+}
+
+func kiroGatewayAccountDir() string {
+	return filepath.Join(storage.GetDataDir(), "kiro-gateway-accounts")
+}
+
+func nowLocalString() string {
+	return time.Now().Format("2006-01-02 15:04:05")
+}
+
+func loadKiroAccountStates() (map[string]kiroAccountLifecycle, error) {
+	kiroAccountStateMu.Lock()
+	defer kiroAccountStateMu.Unlock()
+	return loadKiroAccountStatesUnlocked()
+}
+
+func loadKiroAccountStatesUnlocked() (map[string]kiroAccountLifecycle, error) {
+	path := kiroAccountStatePath()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]kiroAccountLifecycle{}, nil
+		}
+		return nil, err
+	}
+	if len(bytes.TrimSpace(b)) == 0 {
+		return map[string]kiroAccountLifecycle{}, nil
+	}
+	var states map[string]kiroAccountLifecycle
+	if err := json.Unmarshal(b, &states); err != nil {
+		return nil, err
+	}
+	if states == nil {
+		states = map[string]kiroAccountLifecycle{}
+	}
+	return states, nil
+}
+
+func saveKiroAccountStates(states map[string]kiroAccountLifecycle) error {
+	kiroAccountStateMu.Lock()
+	defer kiroAccountStateMu.Unlock()
+	return saveKiroAccountStatesUnlocked(states)
+}
+
+func saveKiroAccountStatesUnlocked(states map[string]kiroAccountLifecycle) error {
+	path := kiroAccountStatePath()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(states, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+func updateKiroAccountState(email string, fn func(*kiroAccountLifecycle)) (kiroAccountLifecycle, error) {
+	kiroAccountStateMu.Lock()
+	defer kiroAccountStateMu.Unlock()
+	states, err := loadKiroAccountStatesUnlocked()
+	if err != nil {
+		return kiroAccountLifecycle{}, err
+	}
+	state := states[email]
+	if state.Email == "" {
+		state.Email = email
+	}
+	if state.Status == "" {
+		state.Status = "new"
+	}
+	fn(&state)
+	state.UpdatedAt = nowLocalString()
+	states[email] = state
+	if err := saveKiroAccountStatesUnlocked(states); err != nil {
+		return kiroAccountLifecycle{}, err
+	}
+	return state, nil
+}
+
+func deleteKiroAccountStates(emails []string) error {
+	kiroAccountStateMu.Lock()
+	defer kiroAccountStateMu.Unlock()
+	states, err := loadKiroAccountStatesUnlocked()
+	if err != nil {
+		return err
+	}
+	for _, email := range emails {
+		delete(states, email)
+	}
+	return saveKiroAccountStatesUnlocked(states)
+}
+
+func markKiroAccountError(email, status, errText string) {
+	if status == "" {
+		status = "error"
+	}
+	_, _ = updateKiroAccountState(email, func(state *kiroAccountLifecycle) {
+		state.Status = status
+		state.LastError = errText
+		state.LastPrecheckAt = nowLocalString()
+	})
 }
 
 func appendKiroCliLogFile(line string) {
@@ -376,6 +502,120 @@ func runKiroCli(args ...string) (string, error) {
 	return text, nil
 }
 
+func kiroGatewayAccountFileName(email string) string {
+	name := strings.ToLower(strings.TrimSpace(email))
+	name = strings.ReplaceAll(name, "@", "_")
+	name = strings.ReplaceAll(name, ".", "_")
+	name = regexp.MustCompile(`[^a-z0-9_-]+`).ReplaceAllString(name, "_")
+	name = strings.Trim(name, "_")
+	if name == "" {
+		name = "account"
+	}
+	return name + ".json"
+}
+
+func extractProfileArnFromKiroCliOutput(text string) string {
+	lines := strings.Split(text, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var raw map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+			continue
+		}
+		if arn, _ := raw["profileArn"].(string); arn != "" {
+			return arn
+		}
+	}
+	match := regexp.MustCompile(`arn:aws:codewhisperer:[^"\s,}]+`).FindString(text)
+	return match
+}
+
+func resolveKiroCliProfileArnWithRestore(acc kiroCliAccount, token kiroCliToken) (string, error) {
+	kiroCliAuthMu.Lock()
+	defer kiroCliAuthMu.Unlock()
+
+	backup, err := writeOfficialKiroCliAuth(acc, token)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := restoreOfficialKiroCliAuth(backup); err != nil {
+			kiroCliLog("gateway-export", acc.Email, "restore-cli-auth", "恢复官方 Kiro CLI 登录态失败: "+truncateKiroCliText(err.Error(), 500))
+		}
+	}()
+	out, err := runKiroCli("chat", "_", "get-kas-token")
+	if err != nil {
+		return "", err
+	}
+	arn := extractProfileArnFromKiroCliOutput(out)
+	if arn == "" {
+		return "", fmt.Errorf("Kiro CLI 未返回 profileArn")
+	}
+	return arn, nil
+}
+
+func writeGatewayAccountJSON(acc kiroCliAccount, profileArn string) (string, error) {
+	if err := validateKiroCliAccount(acc); err != nil {
+		return "", err
+	}
+	if profileArn == "" {
+		return "", fmt.Errorf("缺少 profileArn")
+	}
+	dir := kiroGatewayAccountDir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	path := filepath.Join(dir, kiroGatewayAccountFileName(acc.Email))
+	doc := map[string]interface{}{
+		"email":           acc.Email,
+		"provider":        acc.Provider,
+		"clientId":        acc.ClientID,
+		"clientSecret":    acc.ClientSecret,
+		"refreshToken":    acc.RefreshToken,
+		"region":          acc.Region,
+		"subscription":    acc.Subscription,
+		"time":            acc.Time,
+		"profileArn":      profileArn,
+		"profile_arn":     profileArn,
+		"kiroxExportedAt": nowLocalString(),
+	}
+	b, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0600); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func removeGatewayAccountJSON(email string, state kiroAccountLifecycle) {
+	candidates := []string{}
+	if state.GatewayFile != "" {
+		candidates = append(candidates, state.GatewayFile)
+	}
+	if email != "" {
+		candidates = append(candidates, filepath.Join(kiroGatewayAccountDir(), kiroGatewayAccountFileName(email)))
+	}
+	seen := map[string]bool{}
+	for _, path := range candidates {
+		if path == "" || seen[path] {
+			continue
+		}
+		seen[path] = true
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			kiroCliLog("delete", email, "delete-gateway-json", "删除本地 Gateway JSON 失败: "+truncateKiroCliText(err.Error(), 500))
+		}
+	}
+}
+
 // LoadKiroCliAccounts 读取输出账号并显示当前官方 Kiro CLI 登录邮箱。
 func (a *App) LoadKiroCliAccounts() map[string]interface{} {
 	const action = "load"
@@ -384,9 +624,22 @@ func (a *App) LoadKiroCliAccounts() map[string]interface{} {
 	if err != nil {
 		return kiroCliFail(action, "-", "load-accounts", err)
 	}
+	states, err := loadKiroAccountStates()
+	if err != nil {
+		return kiroCliFail(action, "-", "load-account-state", err)
+	}
+	for _, item := range items {
+		email, _ := item["email"].(string)
+		state := states[email]
+		if state.Email == "" && email != "" {
+			state = kiroAccountLifecycle{Email: email, Status: "new"}
+		}
+		item["lifecycle"] = state
+	}
 	current := ""
 	if _, err := os.Stat(kiroCliExePath); err == nil {
 		kiroCliLog(action, "-", "detect-current-cli", "读取当前官方 Kiro CLI 登录账号")
+		kiroCliAuthMu.Lock()
 		if out, err := runKiroCli("whoami"); err == nil {
 			for _, line := range strings.Split(out, "\n") {
 				line = strings.TrimSpace(line)
@@ -400,12 +653,15 @@ func (a *App) LoadKiroCliAccounts() map[string]interface{} {
 		} else {
 			kiroCliLog(action, "-", "detect-current-cli", "读取当前官方 Kiro CLI 账号失败: "+truncateKiroCliText(err.Error(), 500))
 		}
+		kiroCliAuthMu.Unlock()
 	}
 	kiroCliLog(action, "-", "load-accounts", fmt.Sprintf("加载完成，共 %d 个账号", len(items)))
 	return map[string]interface{}{
 		"success":      true,
 		"accounts":     items,
 		"outputDir":    storage.GetResultOutputDir(),
+		"gatewayDir":   kiroGatewayAccountDir(),
+		"statePath":    kiroAccountStatePath(),
 		"currentEmail": current,
 		"logPath":      kiroCliLogPath(),
 	}
@@ -422,6 +678,11 @@ func (a *App) PrecheckKiroCliAccount(email string) map[string]interface{} {
 	kiroCliLog(action, email, "refresh-token", "刷新访问令牌")
 	token, err := refreshKiroCliToken(acc)
 	if err != nil {
+		status := "error"
+		if isKiroCliSuspendedText(err.Error()) {
+			status = "suspended"
+		}
+		markKiroAccountError(email, status, err.Error())
 		return kiroCliFail(action, email, "refresh-token", err)
 	}
 	kiroCliLog(action, email, "real-chat-precheck", "执行 kiro.rs 风格真实 chat 预检")
@@ -434,10 +695,24 @@ func (a *App) PrecheckKiroCliAccount(email string) map[string]interface{} {
 		result["stage"] = "real-chat-precheck"
 		result["error"] = err.Error()
 		kiroCliLog(action, email, "real-chat-precheck", "失败: "+truncateKiroCliText(err.Error(), 800))
+		_, _ = updateKiroAccountState(email, func(state *kiroAccountLifecycle) {
+			if isKiroCliSuspendedText(err.Error()) || (result != nil && result["suspended"] == true) {
+				state.Status = "suspended"
+			} else {
+				state.Status = "error"
+			}
+			state.LastError = err.Error()
+			state.LastPrecheckAt = nowLocalString()
+		})
 		return result
 	}
 	result["success"] = true
 	result["stage"] = "done"
+	_, _ = updateKiroAccountState(email, func(state *kiroAccountLifecycle) {
+		state.Status = "available"
+		state.LastError = ""
+		state.LastPrecheckAt = nowLocalString()
+	})
 	kiroCliLog(action, email, "done", "预检通过")
 	return result
 }
@@ -453,6 +728,11 @@ func (a *App) ImportKiroCliAccount(email string) map[string]interface{} {
 	kiroCliLog(action, email, "refresh-token", "刷新访问令牌")
 	token, err := refreshKiroCliToken(acc)
 	if err != nil {
+		status := "error"
+		if isKiroCliSuspendedText(err.Error()) {
+			status = "suspended"
+		}
+		markKiroAccountError(email, status, err.Error())
 		return kiroCliFail(action, email, "refresh-token", err)
 	}
 	kiroCliLog(action, email, "real-chat-precheck", "执行导入前真实 chat 预检")
@@ -465,9 +745,20 @@ func (a *App) ImportKiroCliAccount(email string) map[string]interface{} {
 		precheck["stage"] = "real-chat-precheck"
 		precheck["error"] = err.Error()
 		kiroCliLog(action, email, "real-chat-precheck", "失败: "+truncateKiroCliText(err.Error(), 800))
+		_, _ = updateKiroAccountState(email, func(state *kiroAccountLifecycle) {
+			if isKiroCliSuspendedText(err.Error()) || (precheck != nil && precheck["suspended"] == true) {
+				state.Status = "suspended"
+			} else {
+				state.Status = "error"
+			}
+			state.LastError = err.Error()
+			state.LastPrecheckAt = nowLocalString()
+		})
 		return precheck
 	}
 	kiroCliLog(action, email, "write-auth", "写入官方 Kiro CLI 登录态")
+	kiroCliAuthMu.Lock()
+	defer kiroCliAuthMu.Unlock()
 	backup, err := writeOfficialKiroCliAuth(acc, token)
 	if err != nil {
 		return kiroCliFail(action, email, "write-auth", err)
@@ -507,6 +798,11 @@ func (a *App) ImportKiroCliAccount(email string) map[string]interface{} {
 		return res
 	}
 	kiroCliLog(action, email, "done", "导入成功")
+	_, _ = updateKiroAccountState(email, func(state *kiroAccountLifecycle) {
+		state.Status = "cli_imported"
+		state.LastError = ""
+		state.LastCliImportAt = nowLocalString()
+	})
 	return map[string]interface{}{"success": true, "email": email, "backup": backup, "stage": "done"}
 }
 
@@ -514,10 +810,13 @@ func (a *App) ImportKiroCliAccount(email string) map[string]interface{} {
 func (a *App) DeleteKiroCliAccount(email string) map[string]interface{} {
 	const action = "delete"
 	kiroCliLog(action, email, "delete-account", "删除账号")
+	states, _ := loadKiroAccountStates()
+	removeGatewayAccountJSON(email, states[email])
 	removed, err := data.DeleteAccount(storage.GetResultOutputDir(), email)
 	if err != nil {
 		return kiroCliFail(action, email, "delete-account", err)
 	}
+	_ = deleteKiroAccountStates([]string{email})
 	kiroCliLog(action, email, "delete-account", fmt.Sprintf("删除完成 removed=%v", removed))
 	return map[string]interface{}{"success": true, "removed": removed}
 }
@@ -527,8 +826,10 @@ func (a *App) DeleteSuspendedKiroCliAccounts(emails []string) map[string]interfa
 	const action = "delete-suspended"
 	kiroCliLog(action, "-", "delete-suspended", fmt.Sprintf("开始删除 %d 个已封禁账号", len(emails)))
 	removed := 0
+	states, _ := loadKiroAccountStates()
 	for _, email := range emails {
 		kiroCliLog(action, email, "delete-account", "删除账号")
+		removeGatewayAccountJSON(email, states[email])
 		ok, err := data.DeleteAccount(storage.GetResultOutputDir(), email)
 		if err != nil {
 			res := kiroCliFail(action, email, "delete-account", err)
@@ -539,8 +840,112 @@ func (a *App) DeleteSuspendedKiroCliAccounts(emails []string) map[string]interfa
 			removed++
 		}
 	}
+	_ = deleteKiroAccountStates(emails)
 	kiroCliLog(action, "-", "done", fmt.Sprintf("删除完成 removed=%d", removed))
 	return map[string]interface{}{"success": true, "removed": removed}
+}
+
+// ExportKiroGatewayAccount 生成包含 profileArn 的 kiro-gateway 账号 JSON，不改变最终 Kiro CLI 登录态。
+func (a *App) ExportKiroGatewayAccount(email string) map[string]interface{} {
+	const action = "gateway-export"
+	kiroCliLog(action, email, "find-account", "开始生成 gateway 账号 JSON")
+	acc, err := findKiroCliAccount(email)
+	if err != nil {
+		return kiroCliFail(action, email, "find-account", err)
+	}
+	kiroCliLog(action, email, "refresh-token", "刷新访问令牌")
+	token, err := refreshKiroCliToken(acc)
+	if err != nil {
+		status := "error"
+		if isKiroCliSuspendedText(err.Error()) {
+			status = "suspended"
+		}
+		markKiroAccountError(email, status, err.Error())
+		return kiroCliFail(action, email, "refresh-token", err)
+	}
+	kiroCliLog(action, email, "real-chat-precheck", "导出前真实 chat 预检")
+	precheck, err := precheckKiroCliChat(acc, token)
+	if err != nil {
+		if precheck == nil {
+			precheck = map[string]interface{}{}
+		}
+		precheck["success"] = false
+		precheck["stage"] = "real-chat-precheck"
+		precheck["error"] = err.Error()
+		_, _ = updateKiroAccountState(email, func(state *kiroAccountLifecycle) {
+			if isKiroCliSuspendedText(err.Error()) || precheck["suspended"] == true {
+				state.Status = "suspended"
+			} else {
+				state.Status = "error"
+			}
+			state.LastError = err.Error()
+			state.LastPrecheckAt = nowLocalString()
+		})
+		kiroCliLog(action, email, "real-chat-precheck", "失败: "+truncateKiroCliText(err.Error(), 800))
+		return precheck
+	}
+	kiroCliLog(action, email, "resolve-profile-arn", "通过官方 Kiro CLI 解析 profileArn")
+	profileArn, err := resolveKiroCliProfileArnWithRestore(acc, token)
+	if err != nil {
+		return kiroCliFail(action, email, "resolve-profile-arn", err)
+	}
+	kiroCliLog(action, email, "write-gateway-json", "写入 gateway 账号 JSON")
+	path, err := writeGatewayAccountJSON(acc, profileArn)
+	if err != nil {
+		return kiroCliFail(action, email, "write-gateway-json", err)
+	}
+	state, _ := updateKiroAccountState(email, func(state *kiroAccountLifecycle) {
+		state.Status = "gateway_ready"
+		state.ProfileArn = profileArn
+		state.GatewayFile = path
+		state.LastGatewayExportAt = nowLocalString()
+		state.LastPrecheckAt = nowLocalString()
+		state.LastError = ""
+	})
+	kiroCliLog(action, email, "done", "gateway 账号 JSON 已生成: "+path)
+	return map[string]interface{}{
+		"success":    true,
+		"email":      email,
+		"profileArn": profileArn,
+		"path":       path,
+		"state":      state,
+	}
+}
+
+// SetKiroAccountLifecycle 手工标记账号生命周期状态，不删除账号。
+func (a *App) SetKiroAccountLifecycle(email, status, note string) map[string]interface{} {
+	const action = "mark-lifecycle"
+	allowed := map[string]bool{
+		"new":              true,
+		"available":        true,
+		"gateway_ready":    true,
+		"gateway_uploaded": true,
+		"cli_imported":     true,
+		"limited":          true,
+		"suspended":        true,
+		"retired":          true,
+		"error":            true,
+	}
+	if !allowed[status] {
+		return kiroCliFail(action, email, "validate-status", fmt.Errorf("不支持的状态: %s", status))
+	}
+	state, err := updateKiroAccountState(email, func(state *kiroAccountLifecycle) {
+		state.Status = status
+		state.Note = strings.TrimSpace(note)
+		if status == "suspended" || status == "limited" || status == "retired" {
+			state.LastError = state.Note
+		}
+	})
+	if err != nil {
+		return kiroCliFail(action, email, "save-state", err)
+	}
+	kiroCliLog(action, email, "done", "状态已更新为 "+status)
+	return map[string]interface{}{"success": true, "state": state}
+}
+
+// KiroGatewayExportDir 返回本地 gateway 账号 JSON 输出目录。
+func (a *App) KiroGatewayExportDir() string {
+	return kiroGatewayAccountDir()
 }
 
 // KiroCliStartCommand 返回当前推荐的官方 CLI 启动命令。

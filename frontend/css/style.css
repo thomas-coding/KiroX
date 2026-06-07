@@ -123,6 +123,110 @@ iframe::-webkit-scrollbar {
   border-radius: 20px;
 }
 
+/* ===== Kiro Account Lifecycle ===== */
+.kiro-life-stat {
+  min-height: 54px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.kiro-life-stat span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.kiro-life-stat strong {
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  font-family: var(--font-mono);
+}
+.kiro-life-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;
+}
+.kiro-life-table th,
+.kiro-life-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.kiro-life-table tbody tr:hover {
+  background: var(--bg-subtle);
+}
+.kiro-life-email {
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.kiro-life-sub {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kiro-life-muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+.kiro-life-current {
+  color: #10b981;
+  font-weight: 800;
+  font-size: 12px;
+}
+.kiro-life-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  height: 24px;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--muted);
+}
+.kiro-life-pill.ok {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.28);
+}
+.kiro-life-pill.busy {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.28);
+}
+.kiro-life-pill.warn {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.10);
+  border-color: rgba(245, 158, 11, 0.30);
+}
+.kiro-life-pill.bad {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.28);
+}
+.kiro-life-actions {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.kiro-life-actions .btn {
+  min-height: 28px;
+}
+
 /* ===== Shared Components ===== */
 .container { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
 

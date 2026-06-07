@@ -7,7 +7,7 @@ function getPageTitle(pageId) {
     var v = window.I18N.t('page.' + pageId);
     if (v && v !== 'page.' + pageId) return v;
   }
-  var fallback = { overview: '概览', logs: '运行日志', register: '注册', accounts: '邮箱池', subscription: '订阅', kirocli: 'Kiro账号管理', info: '关于', settings: '设置' };
+  var fallback = { overview: '概览', logs: '运行日志', register: '注册', accounts: '邮箱池', subscription: '订阅', kirocli: 'Kiro账号管理', gateway: 'Gateway面板', info: '关于', settings: '设置' };
   return fallback[pageId] || pageId;
 }
 function switchPage(pageId) {
@@ -40,6 +40,9 @@ function switchPage(pageId) {
   }
   if (pageId === 'kirocli') {
     reloadKiroCliAccounts();
+  }
+  if (pageId === 'gateway') {
+    reloadKiroGatewayStatus();
   }
 }
 
