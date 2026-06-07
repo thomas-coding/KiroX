@@ -4,7 +4,7 @@
 
 - Branch: `main`
 - Remote: `origin https://github.com/thomas-coding/KiroX.git`
-- Last completed work: Kiro account lifecycle UI, Gateway panel, Mail Manager local config fallback.
+- Last completed work: SMSB Gmail provider for Kiro registration, defaulting to `aws/gmail.com`.
 - Working tree target: clean after commit/push.
 
 ## Done Recently
@@ -12,23 +12,19 @@
 - Reworked Kiro account management into a lifecycle page.
   - Files: `kiro_cli.go`, `frontend/js/kiro_cli.js`, `frontend/index.html`, `frontend/css/style.css`.
   - Tracks local lifecycle in `<dataDir>/kiro-account-state.json`.
-  - Supports precheck, Gateway JSON generation, upload to Gateway, local CLI import, mark limited/suspended/retired, delete, and persistent account logs.
-  - Gateway JSON output directory: `<dataDir>/kiro-gateway-accounts`.
+  - Supports precheck, Gateway JSON generation, one-click Gateway upload, local CLI import, mark limited/suspended/retired, delete, and persistent account logs.
 - Added remote Kiro Gateway panel.
   - Files: `kiro_gateway.go`, `frontend/js/kiro_gateway.js`.
   - Reads private server config from `C:\Users\wujin\.codex\kiro_servers.local.json`.
   - Shows health, container status, remote account JSON files, per-account failures, and request stats.
-  - Reads stats from configured host state path first, then falls back to container `/app/state.json`.
-  - Supports remote JSON delete, Gateway restart, and chat smoke test.
-- Added one-click Gateway upload from the local lifecycle page.
-  - Upload uses `pscp`, restarts the configured Gateway container, and marks local lifecycle `gateway_uploaded`.
-  - Server credentials remain outside the repo.
 - Added Mail Manager local private config fallback.
   - File: `internal/email/mailmanager.go`.
   - Resolution order: explicit config, `KIROX_MAIL_MANAGER_*` env vars, `%APPDATA%\kirox\mail-manager.local.json`, then default URL.
-  - API key is not committed.
-- Increased Wails default window size.
-  - Default: `1280x820`; minimum: `1100x680`.
+- Added SMSB Gmail provider for Kiro registration.
+  - Files: `internal/email/smsb_gmail.go`, `internal/task/coordinator.go`, `internal/core/signup_flow.go`.
+  - Default service is `aws`, domain `gmail.com`, `maxPrice=0.05`; local override lives in `%APPDATA%\kirox\smsb.local.json`.
+  - Each mailbox waits 30 seconds for OTP, cancels with SMSB `setStatus=2` on timeout, and retries up to 3 mailboxes.
+  - Successful OTP capture completes the activation with SMSB `setStatus=3`.
 
 ## Local Runtime State
 
@@ -36,14 +32,16 @@
 - Kiro account logs: `<dataDir>/kiro-cli-account.log`.
 - Local lifecycle state: `<dataDir>/kiro-account-state.json`.
 - Local Gateway JSON output: `<dataDir>/kiro-gateway-accounts`.
-- Private Mail Manager config on this machine: `%APPDATA%\kirox\mail-manager.local.json`.
-- Private old-server config on this machine: `C:\Users\wujin\.codex\kiro_servers.local.json`.
+- Private Mail Manager config: `%APPDATA%\kirox\mail-manager.local.json`.
+- Private SMSB config: `%APPDATA%\kirox\smsb.local.json`.
+- Private old-server config: `C:\Users\wujin\.codex\kiro_servers.local.json`.
 
 ## Observed Results
 
 - `11.layer_midsole@icloud.com` is uploaded on Gateway and has nonzero request stats.
 - `DarrellJohnson2520@outlook.pt` precheck, Gateway JSON export, Gateway upload, and container restart completed successfully.
-- Latest Mail Manager failure at `2026-06-07 16:04:21` was caused by missing runtime API key; local private config fallback was added and local config was created afterward.
+- SMSB `am/gmail.com` repeatedly timed out on Kiro OTP.
+- SMSB `aws/gmail.com` succeeded on the second mailbox at `2026-06-07 18:40:42`; saved account `dufrene899@gmail.com`.
 
 ## Risks
 
@@ -51,6 +49,7 @@
 - Local KiroX account delete removes local lifecycle and local Gateway JSON, but it does not remove remote Gateway JSON.
 - Manually uploaded legacy Gateway JSON may not include `email`; the Gateway panel can still show it by file name.
 - Mail Manager early failures currently call `/fail`, not `/release`, even when failure occurs before submitting email to Kiro.
+- SMSB Gmail is short-lived; once OTP is received, the mailbox is completed and cannot be used for future account repair.
 
 ## Verification
 
@@ -60,15 +59,15 @@
 
 ## Next Step
 
-- After pulling fresh code, launch `build/bin/kirox.exe`, use Gateway panel `刷新状态`, and confirm request stats load from `/app/state.json` fallback.
+- Launch `build/bin/kirox.exe`, run one `SMSB Gmail` registration with count `1` and concurrency `1`, then confirm logs show `aws/gmail.com`, 30-second timeout/release behavior, and account save on success.
 - For future account replacement: register account, precheck, generate Gateway JSON, upload Gateway, then verify on Gateway panel.
 
 ## First Files To Read
 
 - `PROJECT_STATE.md`
+- `ARCHITECTURE.md`
+- `internal/email/smsb_gmail.go`
+- `internal/task/coordinator.go`
+- `internal/core/signup_flow.go`
 - `kiro_cli.go`
 - `kiro_gateway.go`
-- `internal/email/mailmanager.go`
-- `frontend/js/kiro_cli.js`
-- `frontend/js/kiro_gateway.js`
-- `frontend/index.html`

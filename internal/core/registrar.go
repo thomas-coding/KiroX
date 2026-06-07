@@ -311,6 +311,13 @@ func (r *Registrar) Step3Email() error {
 		log.Printf("email=%s", r.Email)
 		return nil
 	}
+	if r.Cfg.UseSmsbGmail && r.Cfg.SmsbGmailProvider != nil {
+		log.Println("[3] 使用 SMSB Gmail 邮箱")
+		r.EmailSvc = r.Cfg.SmsbGmailProvider
+		r.Email = r.EmailSvc.GetAddress()
+		log.Printf("email=%s", r.Email)
+		return nil
+	}
 	if r.Cfg.UseMoeMail && r.Cfg.MoeMailProvider != nil {
 		log.Println("[3] 使用 MoeMail 邮箱（已创建）")
 		r.EmailSvc = email.NewMoEmailServiceFromProvider(r.Cfg.MoeMailProvider)

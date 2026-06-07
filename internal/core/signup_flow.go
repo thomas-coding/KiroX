@@ -310,6 +310,14 @@ func (r *Registrar) Step10GetOTP() (string, error) {
 		log.Printf("验证码: %s", code)
 		return code, nil
 	}
+	if r.Cfg.UseSmsbGmail {
+		code, err := r.EmailSvc.WaitForCode(30, 3)
+		if err != nil {
+			return "", err
+		}
+		log.Printf("验证码: %s", code)
+		return code, nil
+	}
 	code, err := r.EmailSvc.WaitForCode(120, 3)
 	if err != nil {
 		return "", err

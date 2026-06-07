@@ -167,9 +167,10 @@ function selectEmailProvider(provider) {
   const moemailBtn = document.querySelector('label[onclick*="moemail"]');
   const cloudmailBtn = document.querySelector('label[onclick*="cloudmail"]');
   const mailmanagerBtn = document.querySelector('label[onclick*="mailmanager"]');
+  const smsbGmailBtn = document.querySelector('label[onclick*="smsb_gmail"]');
 
   // 全部还原
-  [outlookBtn, moemailBtn, cloudmailBtn, mailmanagerBtn].forEach(b => {
+  [outlookBtn, moemailBtn, cloudmailBtn, mailmanagerBtn, smsbGmailBtn].forEach(b => {
     if (b) { b.style.borderColor = 'var(--border)'; b.style.background = 'transparent'; }
   });
 
@@ -177,6 +178,7 @@ function selectEmailProvider(provider) {
   if (provider === 'moemail') activeBtn = moemailBtn;
   else if (provider === 'cloudmail') activeBtn = cloudmailBtn;
   else if (provider === 'mailmanager') activeBtn = mailmanagerBtn;
+  else if (provider === 'smsb_gmail') activeBtn = smsbGmailBtn;
   if (activeBtn) {
     activeBtn.style.borderColor = 'var(--primary)';
     activeBtn.style.background = 'rgba(59, 130, 246, 0.1)';
@@ -206,6 +208,10 @@ function selectEmailProvider(provider) {
     hintDiv.removeAttribute('data-i18n');
     hintDiv.textContent = _uiT('register.mailmanagerHint', '使用 Mail Manager 租用邮箱并自动等待 Kiro 验证码。');
     hintDiv.setAttribute('data-i18n', 'register.mailmanagerHint');
+  } else if (provider === 'smsb_gmail') {
+    hintDiv.removeAttribute('data-i18n');
+    hintDiv.textContent = _uiT('register.smsbGmailHint', '使用 SMSB AWS Gmail 临时邮箱并自动等待 Kiro 验证码。');
+    hintDiv.setAttribute('data-i18n', 'register.smsbGmailHint');
   } else {
     hintDiv.removeAttribute('data-i18n');
     hintDiv.textContent = _uiT('register.outlookHintFull', '使用微软邮箱进行注册，代理配置请在设置页设置。');

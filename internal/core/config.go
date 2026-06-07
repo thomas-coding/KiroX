@@ -42,6 +42,9 @@ type Config struct {
 	MailManagerProvider     *email.MailManagerProvider
 	MailManagerProviderType string
 
+	UseSmsbGmail      bool
+	SmsbGmailProvider *email.SmsbGmailProvider
+
 	MoEmailBaseURL string
 	MoEmailAPIKey  string
 }

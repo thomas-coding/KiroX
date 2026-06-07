@@ -23,7 +23,7 @@ type StartTaskRequest struct {
 	Concurrency       int                              `json:"concurrency"`
 	Delay             int                              `json:"delay"`
 	OutputPath        string                           `json:"outputPath"`
-	EmailProvider     string                           `json:"emailProvider"`     // "outlook" / "moemail" / "cloudmail" / "mailmanager"
+	EmailProvider     string                           `json:"emailProvider"`     // "outlook" / "moemail" / "cloudmail" / "mailmanager" / "smsb_gmail"
 	MoeMailDomains    []string                         `json:"moemailDomains"`    // 选中的域名列表
 	MoeMailConfigs    map[string][]email.MoeMailConfig `json:"moemailConfigs"`    // 域名 -> 配置列表映射
 	MoeMailRandomMode bool                             `json:"moemailRandomMode"` // 是否为随机模式
@@ -84,6 +84,8 @@ func startTask(req StartTaskRequest) map[string]interface{} {
 			Manager.mu.Unlock()
 			return map[string]interface{}{"error": "不支持的 Mail Manager 邮箱类型"}
 		}
+	} else if emailProvider == "smsb_gmail" {
+		// SMSB Gmail 不需要 UI 配置；运行时从私有配置或环境变量读取 API key。
 	} else {
 		// Outlook 模式：加载账号列表
 		storedAccounts := storage.GetAccountsCached()
@@ -253,6 +255,9 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		}
 		taskConfig.MailManagerProviderType = req.MailManagerProvider
 		log.Printf("[Kiro] Mail Manager 邮箱类型: %s", req.MailManagerProvider)
+	} else if emailProvider == "smsb_gmail" {
+		taskConfig.UseSmsbGmail = true
+		log.Printf("[Kiro] SMSB Gmail 邮箱类型: aws/gmail.com")
 	}
 
 	// 统计计数器
@@ -413,9 +418,36 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 			log.Printf("[Kiro][%d/%d] Mail Manager 获取邮箱成功: %s", i+1, req.Count, currentEmail)
 		}
 
+		leaseSmsbGmail := func(reason string) error {
+			if reason == "" {
+				log.Printf("[Kiro][%d/%d] 从 SMSB Gmail 获取邮箱", i+1, req.Count)
+			} else {
+				log.Printf("[Kiro][%d/%d] SMSB Gmail 重新获取邮箱: %s", i+1, req.Count, reason)
+			}
+			provider, err := email.NewSmsbGmailProvider(taskCtx, email.SmsbGmailConfig{})
+			if err != nil {
+				log.Printf("[Kiro][%d/%d] SMSB Gmail 获取邮箱失败: %v", i+1, req.Count, err)
+				return err
+			}
+			taskCfg.SmsbGmailProvider = provider
+			currentEmail = provider.GetAddress()
+			log.Printf("[Kiro][%d/%d] SMSB Gmail 获取邮箱成功: %s", i+1, req.Count, currentEmail)
+			return nil
+		}
+		if emailProvider == "smsb_gmail" {
+			if err := leaseSmsbGmail(""); err != nil {
+				Manager.mu.Lock()
+				Manager.completed++
+				Manager.failed++
+				Manager.mu.Unlock()
+				return
+			}
+		}
+
 		var success bool
 		var passwordSet bool
 		var mailManagerFinalized bool
+		var smsbGmailFinalized bool
 		defer func() {
 			if !taskConfig.UseMailManager || taskCfg.MailManagerProvider == nil || mailManagerFinalized {
 				return
@@ -431,11 +463,29 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 				log.Printf("[Kiro][%d/%d] Mail Manager 中断标记失败失败: %v", i+1, req.Count, err)
 			}
 		}()
+		defer func() {
+			if !taskConfig.UseSmsbGmail || taskCfg.SmsbGmailProvider == nil || smsbGmailFinalized {
+				return
+			}
+			if success || passwordSet {
+				return
+			}
+			reason := "kiro_registration_interrupted"
+			if taskCtx.Err() != nil {
+				reason = "kiro_registration_cancelled"
+			}
+			if err := taskCfg.SmsbGmailProvider.Cancel(reason); err != nil {
+				log.Printf("[Kiro][%d/%d] SMSB Gmail 中断取消失败: %v", i+1, req.Count, err)
+			}
+		}()
 
 		log.Printf("[Kiro][%d/%d] 开始注册", i+1, req.Count)
 		itemStart := time.Now()
 
-		const maxAttempts = 2
+		maxAttempts := 2
+		if taskConfig.UseSmsbGmail {
+			maxAttempts = 3
+		}
 
 		var result map[string]interface{}
 	retryLoop:
@@ -502,6 +552,21 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 			if pwSet, _ := result["passwordSet"].(bool); pwSet {
 				log.Printf("[Kiro][%d/%d] 密码已设置但验活失败，邮箱已消耗，不再重试", i+1, req.Count)
 				break
+			}
+
+			if taskConfig.UseSmsbGmail && strings.Contains(errorMsg, "验证码接收超时") {
+				if taskCfg.SmsbGmailProvider != nil {
+					_ = taskCfg.SmsbGmailProvider.Cancel("code_timeout_retry_new_mailbox")
+				}
+				taskCfg.SmsbGmailProvider = nil
+				currentEmail = ""
+				smsbGmailFinalized = true
+				if attempt >= maxAttempts-1 || leaseSmsbGmail("当前邮箱未收到验证码") != nil {
+					break
+				}
+				taskCfg.Password = core.GenPassword()
+				smsbGmailFinalized = false
+				continue retryLoop
 			}
 
 			// 不重试的错误类型（含 context 取消 / 被封 / 临时邮箱重复）
@@ -588,6 +653,23 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 					log.Printf("[Kiro][%d/%d] Mail Manager 标记失败失败: %v", i+1, req.Count, err)
 				}
 				mailManagerFinalized = true
+			}
+		}
+		if taskConfig.UseSmsbGmail && taskCfg.SmsbGmailProvider != nil && !success {
+			passwordSet, _ = result["passwordSet"].(bool)
+			if !passwordSet {
+				errorMsg, _ := result["error"].(string)
+				reason := "kiro_registration_failed"
+				if errorMsg != "" {
+					reason = reason + ": " + errorMsg
+					if len(reason) > 240 {
+						reason = reason[:240]
+					}
+				}
+				if err := taskCfg.SmsbGmailProvider.Cancel(reason); err != nil {
+					log.Printf("[Kiro][%d/%d] SMSB Gmail 取消失败: %v", i+1, req.Count, err)
+				}
+				smsbGmailFinalized = true
 			}
 		}
 		if success {
