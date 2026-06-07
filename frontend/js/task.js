@@ -161,6 +161,20 @@ function copyLogs() {
   });
 }
 
+function copyRegisterLogPath() {
+  window.go.main.App.GetRegisterLogPath().then(function(path) {
+    if (!path) {
+      showToast(_tkT('toast.logPathEmpty', '日志路径尚未生成'), 'error');
+      return;
+    }
+    return navigator.clipboard.writeText(path).then(function() {
+      showToast(_tkT('toast.logPathCopied', '日志路径已复制'), 'success');
+    });
+  }).catch(function(e) {
+    showToast(_tkT('toast.copyFailed', '复制失败') + ': ' + e.message, 'error');
+  });
+}
+
 function notifyTaskComplete(taskName, success, failed, total) {
   var msg = _tkT('toast.taskCompleteMsg', { name: taskName, s: success, f: failed, t: total }, '{name} 任务完成！成功 {s} / 失败 {f} / 共 {t}');
   showToast(msg, success > 0 ? 'success' : 'error');

@@ -7,7 +7,7 @@ function getPageTitle(pageId) {
     var v = window.I18N.t('page.' + pageId);
     if (v && v !== 'page.' + pageId) return v;
   }
-  var fallback = { overview: '概览', logs: '运行日志', register: '注册', accounts: '邮箱池', subscription: '订阅', info: '关于', settings: '设置' };
+  var fallback = { overview: '概览', logs: '运行日志', register: '注册', accounts: '邮箱池', subscription: '订阅', kirocli: 'Kiro账号管理', info: '关于', settings: '设置' };
   return fallback[pageId] || pageId;
 }
 function switchPage(pageId) {
@@ -37,6 +37,9 @@ function switchPage(pageId) {
   }
   if (pageId === 'subscription') {
     reloadSubscriptionAccounts();
+  }
+  if (pageId === 'kirocli') {
+    reloadKiroCliAccounts();
   }
 }
 
@@ -295,11 +298,13 @@ function updateUIStatus(running) {
 
 // 配置读写
 function getFormConfig() {
+  const checkedProvider = document.querySelector('input[name="email-provider"]:checked');
+  const emailProvider = checkedProvider ? checkedProvider.value : (selectedEmailProvider || 'outlook');
   const config = {
     count: parseInt(document.getElementById('cfg-count').value) || 1,
     concurrency: parseInt(document.getElementById('cfg-concurrency').value) || 1,
     delay: parseInt(document.getElementById('cfg-delay').value) || 3,
-    emailProvider: selectedEmailProvider || 'outlook'
+    emailProvider: emailProvider
   };
 
   // 如果选择了 MoeMail，添加域名信息和前缀配置
@@ -355,6 +360,11 @@ function getFormConfig() {
       });
       config.cloudmailRandomMode = false;
     }
+  }
+
+  if (config.emailProvider === 'mailmanager') {
+    const providerSelect = document.getElementById('mailmanager-provider-type');
+    config.mailManagerProvider = providerSelect ? (providerSelect.value || 'hotmail') : 'hotmail';
   }
 
   return config;
@@ -599,4 +609,3 @@ function renderChangelog(md) {
   if (inList) html += '</ul>';
   return html;
 }
-

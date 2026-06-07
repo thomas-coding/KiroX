@@ -282,6 +282,9 @@ func (r *Registrar) Step9SendOTP() error {
 		},
 	}
 
+	if r.Cfg.UseMailManager && r.Cfg.MailManagerProvider != nil {
+		r.Cfg.MailManagerProvider.MarkSentAfter(time.Now().Add(-5 * time.Second).Unix())
+	}
 	respBody, status, _, err := r.DoPostRaw(r.Cfg.ProfileBase+"/api/send-otp", reqPayload, r.BuildProfileHeaders(ref))
 	if err != nil {
 		return err

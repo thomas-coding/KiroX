@@ -67,8 +67,8 @@ func NewRegistrar(cfg *Config) *Registrar {
 	// 按代理绑定稳定指纹：同一出口 IP 下短时间内重复使用同一硬件身份，
 	// 只有 lsubid 前缀 / webpackHash 等真实浏览器会话间也会变的字段每次刷新。
 	identity := browser.IdentityForProxy(cfg.Proxy)
-	log.Printf("[指纹] Chrome: %s | GPU: %s | 内存: %dGB | 核心: %d | 分辨率: %dx%d (%d-bit)", 
-		identity.ChromeVer, identity.GPUModel, identity.DeviceMemory, identity.HardwareConcurrency, 
+	log.Printf("[指纹] Chrome: %s | GPU: %s | 内存: %dGB | 核心: %d | 分辨率: %dx%d (%d-bit)",
+		identity.ChromeVer, identity.GPUModel, identity.DeviceMemory, identity.HardwareConcurrency,
 		identity.Screen.Width, identity.Screen.Height, identity.Screen.ColorDepth)
 
 	client := httputil.NewTLSClient(cfg.Proxy, true, identity.ChromeVer)
@@ -300,6 +300,13 @@ func (r *Registrar) Step3Email() error {
 	if r.Cfg.UseCloudMail && r.Cfg.CloudMailProvider != nil {
 		log.Println("[3] 使用 Cloud-Mail 邮箱")
 		r.EmailSvc = email.NewCloudMailService(r.Cfg.CloudMailProvider)
+		r.Email = r.EmailSvc.GetAddress()
+		log.Printf("email=%s", r.Email)
+		return nil
+	}
+	if r.Cfg.UseMailManager && r.Cfg.MailManagerProvider != nil {
+		log.Println("[3] 使用 Mail Manager 邮箱")
+		r.EmailSvc = r.Cfg.MailManagerProvider
 		r.Email = r.EmailSvc.GetAddress()
 		log.Printf("email=%s", r.Email)
 		return nil

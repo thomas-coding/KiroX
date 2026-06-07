@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"log"
 	"os"
+	"path/filepath"
 	"reg_go/internal/browser"
 	"reg_go/internal/data"
 	"reg_go/internal/email"
 	"reg_go/internal/proxy"
 	"reg_go/internal/subscription"
+	"sync"
 
 	"reg_go/internal/storage"
 	"reg_go/internal/task"
@@ -61,10 +64,34 @@ type logWriter struct {
 	app *App
 }
 
+var registerLogMu sync.Mutex
+
 func (w *logWriter) Write(p []byte) (int, error) {
 	msg := string(p)
 	task.Manager.AppendLog(msg)
+	appendRegisterLogFile(msg)
 	return os.Stderr.Write(p)
+}
+
+func registerLogPath() string {
+	return filepath.Join(storage.GetDataDir(), "kiro-register.log")
+}
+
+func appendRegisterLogFile(msg string) {
+	registerLogMu.Lock()
+	defer registerLogMu.Unlock()
+
+	path := registerLogPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return
+	}
+	entry := fmt.Sprintf("%s %s", time.Now().Format("2006-01-02 15:04:05"), msg)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(entry)
 }
 
 // GetStatus 获取任务状态
@@ -75,6 +102,11 @@ func (a *App) GetStatus() map[string]interface{} {
 // GetLogs 获取日志
 func (a *App) GetLogs() []string {
 	return task.Manager.GetLogs()
+}
+
+// GetRegisterLogPath 获取注册运行日志文件路径。
+func (a *App) GetRegisterLogPath() string {
+	return registerLogPath()
 }
 
 // GetOverview 获取全局概览数据

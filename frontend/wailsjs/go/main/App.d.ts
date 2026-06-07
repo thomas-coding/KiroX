@@ -18,9 +18,13 @@ export function ClearOutlookAccounts():Promise<Record<string, any>>;
 
 export function ClearRegisteredOutlookAccounts():Promise<Record<string, any>>;
 
+export function DeleteKiroCliAccount(arg1:string):Promise<Record<string, any>>;
+
 export function DeleteOutlookAccount(arg1:string):Promise<Record<string, any>>;
 
 export function DeleteProxyEntry(arg1:string):Promise<Record<string, any>>;
+
+export function DeleteSuspendedKiroCliAccounts(arg1:Array<string>):Promise<Record<string, any>>;
 
 export function DetectProxy(arg1:string):Promise<proxy.Info>;
 
@@ -46,6 +50,8 @@ export function GetOverview():Promise<Record<string, any>>;
 
 export function GetProxy():Promise<string>;
 
+export function GetRegisterLogPath():Promise<string>;
+
 export function GetResultOutputDir():Promise<string>;
 
 export function GetStatus():Promise<Record<string, any>>;
@@ -56,15 +62,23 @@ export function GetSubscriptionPlans(arg1:string):Promise<Record<string, any>>;
 
 export function GetTaskStatus():Promise<Record<string, any>>;
 
+export function ImportKiroCliAccount(arg1:string):Promise<Record<string, any>>;
+
 export function ImportOutlookFile(arg1:string):Promise<Record<string, any>>;
 
+export function KiroCliStartCommand():Promise<string>;
+
 export function ListProxyPool():Promise<Array<proxy.PoolEntry>>;
+
+export function LoadKiroCliAccounts():Promise<Record<string, any>>;
 
 export function LoadOutputAccounts():Promise<Record<string, any>>;
 
 export function LogoutLicense():Promise<Record<string, any>>;
 
 export function OpenURL(arg1:string):Promise<void>;
+
+export function PrecheckKiroCliAccount(arg1:string):Promise<Record<string, any>>;
 
 export function ResetDataDir():Promise<Record<string, any>>;
 

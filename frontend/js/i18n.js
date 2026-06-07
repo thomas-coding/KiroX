@@ -61,15 +61,17 @@
         proxyPlaceholder: '例如 http://user:pass@127.0.0.1:7890',
         sound: '提示音', soundDesc: '任务结束时播放提示音'
       },
-      logs: { title: '运行日志', copyLog: '复制日志', empty: '暂无日志' },
+      logs: { title: '运行日志', copyLog: '复制日志', copyPath: '复制日志路径', empty: '暂无日志' },
       register: {
         newTask: '新建注册任务', count: '注册数量', concurrency: '并发数', delay: '延迟 (秒)',
-        emailProvider: '邮箱提供商', outlook: '微软邮箱', moemail: 'MoeMail', cloudmail: 'Cloud-Mail',
+        emailProvider: '邮箱提供商', outlook: '微软邮箱', moemail: 'MoeMail', cloudmail: 'Cloud-Mail', mailmanager: 'Mail Manager',
         selectDomain: '选择域名', selectAllDomain: '全选域名',
+        mailmanagerType: '邮箱类型',
         domainHint: '邮箱名将自动生成随机字符串',
         outlookHint: '使用微软邮箱进行注册。',
         moemailHint: '使用 MoeMail 临时邮箱进行注册，每次任务会自动生成新邮箱。',
         cloudmailHint: '使用 Cloud-Mail 自部署邮箱注册。⚠️ 每次注册会创建永久账号，需手动清理。',
+        mailmanagerHint: '使用 Mail Manager 租用邮箱并自动等待 Kiro 验证码。',
         cloudmailWarn: '⚠️ 每次注册会在 Cloud-Mail 上创建一个永久账号，需手动清理',
         outlookHintFull: '使用微软邮箱进行注册，代理配置请在设置页设置。',
         modeRandom: '随机', modeRoundRobin: '轮询',
@@ -173,7 +175,7 @@
         taskCompleteMsg: '{name} 任务完成！成功 {s} / 失败 {f} / 共 {t}',
         configMissing: '配置缺失', selectAtLeastOne: '请至少选择一个',
         noAvailableAccount: '没有可用账号', noEmailSelected: '未选择邮箱',
-        logCopied: '日志已复制', logEmpty: '暂无日志',
+        logCopied: '日志已复制', logEmpty: '暂无日志', logPathCopied: '日志路径已复制', logPathEmpty: '日志路径尚未生成',
         languageChanged: '已切换语言'
       },
       moemail: {
@@ -312,15 +314,17 @@
         proxyPlaceholder: 'e.g. http://user:pass@127.0.0.1:7890',
         sound: 'Sound', soundDesc: 'Play a sound when a task ends'
       },
-      logs: { title: 'Logs', copyLog: 'Copy logs', empty: 'No logs' },
+      logs: { title: 'Logs', copyLog: 'Copy logs', copyPath: 'Copy log path', empty: 'No logs' },
       register: {
         newTask: 'New registration task', count: 'Count', concurrency: 'Concurrency', delay: 'Delay (s)',
-        emailProvider: 'Email provider', outlook: 'Microsoft', moemail: 'MoeMail', cloudmail: 'Cloud-Mail',
+        emailProvider: 'Email provider', outlook: 'Microsoft', moemail: 'MoeMail', cloudmail: 'Cloud-Mail', mailmanager: 'Mail Manager',
         selectDomain: 'Select domain', selectAllDomain: 'Select all',
+        mailmanagerType: 'Mailbox type',
         domainHint: 'Email username is auto-generated as random string',
         outlookHint: 'Register using Microsoft mailboxes.',
         moemailHint: 'Register using MoeMail temp mailboxes. A new mailbox is generated per task.',
         cloudmailHint: 'Register using self-hosted Cloud-Mail. ⚠️ Each run creates a permanent account — clean up manually.',
+        mailmanagerHint: 'Lease mailboxes from Mail Manager and wait for Kiro OTP automatically.',
         cloudmailWarn: '⚠️ Each registration creates a permanent account on Cloud-Mail. Clean up manually.',
         outlookHintFull: 'Register using Microsoft mailboxes. Configure proxy in Settings.',
         modeRandom: 'Random', modeRoundRobin: 'Round-robin',
@@ -424,7 +428,7 @@
         taskCompleteMsg: '{name} done! Success {s} / Failed {f} / Total {t}',
         configMissing: 'Configuration missing', selectAtLeastOne: 'Select at least one',
         noAvailableAccount: 'No available accounts', noEmailSelected: 'No email selected',
-        logCopied: 'Logs copied', logEmpty: 'No logs to copy',
+        logCopied: 'Logs copied', logEmpty: 'No logs to copy', logPathCopied: 'Log path copied', logPathEmpty: 'Log path is not available',
         languageChanged: 'Language switched'
       },
       moemail: {
@@ -563,15 +567,17 @@
         proxyPlaceholder: '例: http://user:pass@127.0.0.1:7890',
         sound: '通知音', soundDesc: 'タスク終了時に通知音を鳴らす'
       },
-      logs: { title: 'ログ', copyLog: 'ログをコピー', empty: 'ログなし' },
+      logs: { title: 'ログ', copyLog: 'ログをコピー', copyPath: 'ログパスをコピー', empty: 'ログなし' },
       register: {
         newTask: '新規登録タスク', count: '登録数', concurrency: '同時実行数', delay: '遅延 (秒)',
-        emailProvider: 'メールプロバイダ', outlook: 'Microsoft', moemail: 'MoeMail', cloudmail: 'Cloud-Mail',
+        emailProvider: 'メールプロバイダ', outlook: 'Microsoft', moemail: 'MoeMail', cloudmail: 'Cloud-Mail', mailmanager: 'Mail Manager',
         selectDomain: 'ドメイン選択', selectAllDomain: 'すべて選択',
+        mailmanagerType: 'メール種別',
         domainHint: 'ユーザー名はランダム文字列で自動生成されます',
         outlookHint: 'Microsoft メールで登録します。',
         moemailHint: 'MoeMail の使い捨てメールで登録します。タスクごとに新しいメールが生成されます。',
         cloudmailHint: '自己ホスト型 Cloud-Mail で登録します。⚠️ 毎回永続的なアカウントが作成されるため、手動で削除してください。',
+        mailmanagerHint: 'Mail Manager からメールボックスを確保し、Kiro の認証コードを自動で待機します。',
         cloudmailWarn: '⚠️ 登録のたびに Cloud-Mail 上で永続的なアカウントが作成されます。手動で削除してください。',
         outlookHintFull: 'Microsoft メールで登録します。プロキシは設定ページで構成してください。',
         modeRandom: 'ランダム', modeRoundRobin: 'ラウンドロビン',
@@ -675,7 +681,7 @@
         taskCompleteMsg: '{name} 完了! 成功 {s} / 失敗 {f} / 合計 {t}',
         configMissing: '設定が不足しています', selectAtLeastOne: '少なくとも1つ選択してください',
         noAvailableAccount: '利用可能なアカウントなし', noEmailSelected: 'メールが選択されていません',
-        logCopied: 'ログをコピー', logEmpty: 'ログがありません',
+        logCopied: 'ログをコピー', logEmpty: 'ログがありません', logPathCopied: 'ログパスをコピーしました', logPathEmpty: 'ログパスがありません',
         languageChanged: '言語を切り替えました'
       },
       moemail: {

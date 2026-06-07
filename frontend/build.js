@@ -77,10 +77,28 @@ const distJsDir = path.join(distDir, 'js');
 if (!fs.existsSync(distJsDir)) {
   fs.mkdirSync(distJsDir, { recursive: true });
 }
-const jsFiles = ['i18n.js', 'accounts.js', 'task.js', 'overview.js', 'app.js', 'moemail.js', 'cloudmail.js', 'ui.js', 'subscription.js', 'proxy_pool.js'];
+const jsFiles = ['i18n.js', 'accounts.js', 'task.js', 'overview.js', 'app.js', 'moemail.js', 'cloudmail.js', 'ui.js', 'subscription.js', 'kiro_cli.js', 'proxy_pool.js'];
 for (const file of jsFiles) {
   fs.copyFileSync(path.join(jsDir, file), path.join(distJsDir, file));
 }
 console.log('✓ 已复制 js/ 脚本 (' + jsFiles.length + ' 个)');
+
+// 同步 Wails Windows 构建图标源，避免裸构建使用默认 Wails 图标。
+const projectRoot = path.join(__dirname, '..');
+const buildIcon = path.join(projectRoot, 'build', 'appicon.png');
+const windowsIcon = path.join(projectRoot, 'build', 'windows', 'icon.ico');
+const appIcon = path.join(assetsDir, 'appicon.png');
+if (fs.existsSync(appIcon)) {
+  const oldHash = fs.existsSync(buildIcon) ? fs.readFileSync(buildIcon).toString('base64') : '';
+  const newHash = fs.readFileSync(appIcon).toString('base64');
+  if (oldHash !== newHash) {
+    fs.mkdirSync(path.dirname(buildIcon), { recursive: true });
+    fs.copyFileSync(appIcon, buildIcon);
+    console.log('✓ 已同步 Wails 应用图标');
+  }
+  if (fs.existsSync(windowsIcon)) {
+    fs.unlinkSync(windowsIcon);
+  }
+}
 
 console.log('✓ Build completed: frontend/dist/');

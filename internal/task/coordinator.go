@@ -23,14 +23,16 @@ type StartTaskRequest struct {
 	Concurrency       int                              `json:"concurrency"`
 	Delay             int                              `json:"delay"`
 	OutputPath        string                           `json:"outputPath"`
-	EmailProvider     string                           `json:"emailProvider"`     // "outlook" / "moemail" / "cloudmail"
+	EmailProvider     string                           `json:"emailProvider"`     // "outlook" / "moemail" / "cloudmail" / "mailmanager"
 	MoeMailDomains    []string                         `json:"moemailDomains"`    // 选中的域名列表
 	MoeMailConfigs    map[string][]email.MoeMailConfig `json:"moemailConfigs"`    // 域名 -> 配置列表映射
 	MoeMailRandomMode bool                             `json:"moemailRandomMode"` // 是否为随机模式
 
-	CloudMailDomains    []string                            `json:"cloudmailDomains"`
-	CloudMailConfigs    map[string][]email.CloudMailConfig  `json:"cloudmailConfigs"`
-	CloudMailRandomMode bool                                `json:"cloudmailRandomMode"`
+	CloudMailDomains    []string                           `json:"cloudmailDomains"`
+	CloudMailConfigs    map[string][]email.CloudMailConfig `json:"cloudmailConfigs"`
+	CloudMailRandomMode bool                               `json:"cloudmailRandomMode"`
+
+	MailManagerProvider string `json:"mailManagerProvider"`
 }
 
 // StartTask 公开方法（包装器）
@@ -73,6 +75,14 @@ func startTask(req StartTaskRequest) map[string]interface{} {
 		if len(req.CloudMailConfigs) == 0 {
 			Manager.mu.Unlock()
 			return map[string]interface{}{"error": "cloud-mail 配置缺失"}
+		}
+	} else if emailProvider == "mailmanager" {
+		if req.MailManagerProvider == "" {
+			req.MailManagerProvider = "hotmail"
+		}
+		if !email.IsValidMailManagerProvider(req.MailManagerProvider) {
+			Manager.mu.Unlock()
+			return map[string]interface{}{"error": "不支持的 Mail Manager 邮箱类型"}
 		}
 	} else {
 		// Outlook 模式：加载账号列表
@@ -128,6 +138,12 @@ func startTask(req StartTaskRequest) map[string]interface{} {
 	Manager.logsMu.Lock()
 	Manager.logs = nil
 	Manager.logsMu.Unlock()
+
+	if emailProvider == "mailmanager" {
+		log.Printf("[Kiro] 启动任务: count=%d concurrency=%d emailProvider=%s mailManagerProvider=%s", req.Count, req.Concurrency, emailProvider, req.MailManagerProvider)
+	} else {
+		log.Printf("[Kiro] 启动任务: count=%d concurrency=%d emailProvider=%s", req.Count, req.Concurrency, emailProvider)
+	}
 
 	// 后台执行
 	go runBatch(req, emailProvider, outlookAccounts)
@@ -228,6 +244,15 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		}
 
 		log.Printf("[Kiro] cloud-mail 域名池: %v (共 %d 个域名)", cloudmailDomainPool, len(cloudmailDomainPool))
+	}
+
+	if emailProvider == "mailmanager" {
+		taskConfig.UseMailManager = true
+		if req.MailManagerProvider == "" {
+			req.MailManagerProvider = "hotmail"
+		}
+		taskConfig.MailManagerProviderType = req.MailManagerProvider
+		log.Printf("[Kiro] Mail Manager 邮箱类型: %s", req.MailManagerProvider)
 	}
 
 	// 统计计数器
@@ -366,7 +391,46 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 			cfgCopy := config
 			taskCfg.CloudMailConfig = &cfgCopy
 			currentEmail = provider.GetAddress()
+		} else if emailProvider == "mailmanager" {
+			providerType := req.MailManagerProvider
+			if providerType == "" {
+				providerType = "hotmail"
+			}
+			log.Printf("[Kiro][%d/%d] 从 Mail Manager 获取邮箱: %s", i+1, req.Count, providerType)
+
+			provider, err := email.NewMailManagerProviderWithContext(taskCtx, providerType, i)
+			if err != nil {
+				log.Printf("[Kiro][%d/%d] Mail Manager 获取邮箱失败: %v", i+1, req.Count, err)
+				Manager.mu.Lock()
+				Manager.completed++
+				Manager.failed++
+				Manager.mu.Unlock()
+				return
+			}
+
+			taskCfg.MailManagerProvider = provider
+			currentEmail = provider.GetAddress()
+			log.Printf("[Kiro][%d/%d] Mail Manager 获取邮箱成功: %s", i+1, req.Count, currentEmail)
 		}
+
+		var success bool
+		var passwordSet bool
+		var mailManagerFinalized bool
+		defer func() {
+			if !taskConfig.UseMailManager || taskCfg.MailManagerProvider == nil || mailManagerFinalized {
+				return
+			}
+			if success || passwordSet {
+				return
+			}
+			reason := "kiro_registration_interrupted"
+			if taskCtx.Err() != nil {
+				reason = "kiro_registration_cancelled"
+			}
+			if err := taskCfg.MailManagerProvider.Fail(reason); err != nil {
+				log.Printf("[Kiro][%d/%d] Mail Manager 中断标记失败失败: %v", i+1, req.Count, err)
+			}
+		}()
 
 		log.Printf("[Kiro][%d/%d] 开始注册", i+1, req.Count)
 		itemStart := time.Now()
@@ -463,7 +527,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		Manager.results = append(Manager.results, result)
 		Manager.completed++
 
-		success := result["status"] == "success"
+		success = result["status"] == "success"
 		if success {
 			Manager.success++
 		} else {
@@ -503,11 +567,28 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		// 只有设置完密码后（passwordSet=true）才标记邮箱为已注册
 		// 之前步骤失败的邮箱不标记，等同于归还到邮箱池
 		if taskConfig.UseOutlook && currentEmail != "" {
-			passwordSet, _ := result["passwordSet"].(bool)
+			passwordSet, _ = result["passwordSet"].(bool)
 			if passwordSet {
 				email.UpdateAccountStatus(currentEmail, true, success)
 			}
 			// 未设密码的失败邮箱不标记 registered，下次任务可继续使用
+		}
+		if taskConfig.UseMailManager && taskCfg.MailManagerProvider != nil && !success {
+			passwordSet, _ = result["passwordSet"].(bool)
+			if !passwordSet {
+				errorMsg, _ := result["error"].(string)
+				reason := "kiro_registration_failed"
+				if errorMsg != "" {
+					reason = reason + ": " + errorMsg
+					if len(reason) > 240 {
+						reason = reason[:240]
+					}
+				}
+				if err := taskCfg.MailManagerProvider.Fail(reason); err != nil {
+					log.Printf("[Kiro][%d/%d] Mail Manager 标记失败失败: %v", i+1, req.Count, err)
+				}
+				mailManagerFinalized = true
+			}
 		}
 		if success {
 			if err := data.SaveKiroSuccess(result, outDir); err != nil {
@@ -619,10 +700,10 @@ func isKillSwitchError(errorMsg string) bool {
 		return false
 	}
 	triggers := []string{
-		"send-otp 失败 (400)",     // Step9 原始 400
-		"注册被拦截",                // formatError 对 BLOCKED/注册请求被拦截 的翻译
-		"IP或浏览器指纹被检测",    // 指纹/IP 被标记
-		"BLOCKED",                  // 响应体里直接包含的风控标记
+		"send-otp 失败 (400)", // Step9 原始 400
+		"注册被拦截",             // formatError 对 BLOCKED/注册请求被拦截 的翻译
+		"IP或浏览器指纹被检测",       // 指纹/IP 被标记
+		"BLOCKED",           // 响应体里直接包含的风控标记
 		"注册请求被拦截",
 	}
 	for _, t := range triggers {

@@ -159,20 +159,24 @@ function initEmailProviderSelection() {
 // 选择邮箱提供商
 function selectEmailProvider(provider) {
   selectedEmailProvider = provider;
+  const providerInput = document.querySelector('input[name="email-provider"][value="' + provider + '"]');
+  if (providerInput) providerInput.checked = true;
 
   // 更新按钮样式
   const outlookBtn = document.querySelector('label[onclick*="outlook"]');
   const moemailBtn = document.querySelector('label[onclick*="moemail"]');
   const cloudmailBtn = document.querySelector('label[onclick*="cloudmail"]');
+  const mailmanagerBtn = document.querySelector('label[onclick*="mailmanager"]');
 
   // 全部还原
-  [outlookBtn, moemailBtn, cloudmailBtn].forEach(b => {
+  [outlookBtn, moemailBtn, cloudmailBtn, mailmanagerBtn].forEach(b => {
     if (b) { b.style.borderColor = 'var(--border)'; b.style.background = 'transparent'; }
   });
 
   let activeBtn = outlookBtn;
   if (provider === 'moemail') activeBtn = moemailBtn;
   else if (provider === 'cloudmail') activeBtn = cloudmailBtn;
+  else if (provider === 'mailmanager') activeBtn = mailmanagerBtn;
   if (activeBtn) {
     activeBtn.style.borderColor = 'var(--primary)';
     activeBtn.style.background = 'rgba(59, 130, 246, 0.1)';
@@ -181,10 +185,12 @@ function selectEmailProvider(provider) {
   // 显示/隐藏配置块
   const moemailConfigDiv = document.getElementById('moemail-config-select');
   const cloudmailConfigDiv = document.getElementById('cloudmail-config-select');
+  const mailmanagerConfigDiv = document.getElementById('mailmanager-config-select');
   const hintDiv = document.getElementById('email-provider-hint');
 
   if (moemailConfigDiv) moemailConfigDiv.style.display = (provider === 'moemail') ? 'block' : 'none';
   if (cloudmailConfigDiv) cloudmailConfigDiv.style.display = (provider === 'cloudmail') ? 'block' : 'none';
+  if (mailmanagerConfigDiv) mailmanagerConfigDiv.style.display = (provider === 'mailmanager') ? 'block' : 'none';
 
   if (provider === 'moemail') {
     hintDiv.removeAttribute('data-i18n');
@@ -196,6 +202,10 @@ function selectEmailProvider(provider) {
     hintDiv.textContent = _uiT('register.cloudmailHint', '使用 Cloud-Mail 自部署邮箱注册。⚠️ 每次注册会创建永久账号，需手动清理。');
     hintDiv.setAttribute('data-i18n', 'register.cloudmailHint');
     loadCloudMailDomainsToList();
+  } else if (provider === 'mailmanager') {
+    hintDiv.removeAttribute('data-i18n');
+    hintDiv.textContent = _uiT('register.mailmanagerHint', '使用 Mail Manager 租用邮箱并自动等待 Kiro 验证码。');
+    hintDiv.setAttribute('data-i18n', 'register.mailmanagerHint');
   } else {
     hintDiv.removeAttribute('data-i18n');
     hintDiv.textContent = _uiT('register.outlookHintFull', '使用微软邮箱进行注册，代理配置请在设置页设置。');
@@ -467,4 +477,3 @@ function closeKiroTaskModal() {
     });
   });
 })();
-

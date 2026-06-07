@@ -171,6 +171,12 @@
       <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
       <span class="nav-tooltip" data-i18n="nav.subscription">订阅</span>
     </div>
+    <!-- Kiro CLI 账号管理 -->
+    <div class="nav-item" onclick="switchPage('kirocli')" data-page="kirocli">
+      <div class="nav-dot"></div>
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/><path d="M15 15l2 2 4-4"/></svg>
+      <span class="nav-tooltip">Kiro账号管理</span>
+    </div>
   </div>
 
   <div class="sidebar-bottom">
@@ -474,10 +480,16 @@
         <div class="logs-panel" style="flex:1;min-height:0;display:flex;flex-direction:column;">
           <div class="logs-panel-header" style="display:flex;align-items:center;justify-content:space-between;">
             <span style="font-weight:700;" data-i18n="logs.title">运行日志</span>
-            <button onclick="copyLogs()" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-              <span data-i18n="logs.copyLog">复制日志</span>
-            </button>
+            <div style="display:flex;gap:8px;">
+              <button onclick="copyRegisterLogPath()" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+                <span data-i18n="logs.copyPath">复制日志路径</span>
+              </button>
+              <button onclick="copyLogs()" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                <span data-i18n="logs.copyLog">复制日志</span>
+              </button>
+            </div>
           </div>
           <div id="unified-log-box" class="log-box" style="flex:1;min-height:0;overflow-y:auto;"></div>
         </div>
@@ -539,6 +551,46 @@
       </div>
     </div>
 
+    <!-- ===== Page: Kiro CLI 账号管理 ===== -->
+    <div class="page" id="page-kirocli">
+      <div class="page-scroll" style="padding:28px 32px 40px;max-width:1120px;margin:0 auto;">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="settings-group">
+            <div class="settings-group-title">
+              <span>Kiro CLI 账号管理</span>
+              <span style="font-weight:400;color:var(--muted);font-size:11px;margin-left:6px;" id="kirocli-output-dir">已加载账号输出目录</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--border);">
+              <button onclick="reloadKiroCliAccounts()" class="btn btn-secondary btn-sm">重新加载账号</button>
+              <button onclick="deleteSuspendedKiroCliAccounts()" class="btn btn-danger btn-sm">删除已封禁</button>
+              <button onclick="copyKiroCliStartCommand()" class="btn btn-dark btn-sm">复制启动命令</button>
+              <button onclick="copyKiroCliLogPath()" class="btn btn-secondary btn-sm">复制日志路径</button>
+              <span id="kirocli-progress" style="font-size:12px;color:var(--muted);margin-left:auto;">未加载</span>
+            </div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.6;">
+              导入会先做真实 chat 预检；预检失败不会改动官方 Kiro CLI 当前登录态。导入成功会替换当前 Kiro CLI 账号。
+            </div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                  <tr style="text-align:left;color:var(--muted);font-size:12px;">
+                    <th style="padding:8px 12px;width:42px;">#</th>
+                    <th style="padding:8px 8px;">邮箱</th>
+                    <th style="padding:8px 8px;width:120px;">订阅</th>
+                    <th style="padding:8px 8px;width:150px;">注册时间</th>
+                    <th style="padding:8px 8px;width:90px;">状态</th>
+                    <th style="padding:8px 8px;width:70px;">CLI</th>
+                    <th style="padding:8px 12px;width:230px;text-align:right;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="kirocli-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== 订阅计划选择模态框 ===== -->
     <div id="sub-plan-modal" class="modal-overlay">
       <div class="modal-content" style="max-width:560px;">
@@ -576,6 +628,18 @@
       </div>
     </div>
 
+    <!-- ===== Kiro CLI 删除确认模态框 ===== -->
+    <div id="kirocli-confirm-modal" class="modal-overlay" style="z-index:1100;">
+      <div class="modal-content" style="max-width:420px;padding:24px;">
+        <h3 id="kirocli-confirm-title" style="margin-bottom:10px;font-size:16px;font-weight:700;">确认删除</h3>
+        <p id="kirocli-confirm-message" style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:20px;"></p>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button onclick="closeKiroCliConfirm(false)" class="btn btn-secondary" style="min-width:96px;justify-content:center;">取消</button>
+          <button onclick="closeKiroCliConfirm(true)" id="kirocli-confirm-ok" class="btn btn-danger" style="min-width:108px;justify-content:center;">确认删除</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== Page: 注册 ===== -->
     <div class="page" id="page-register">
       <div class="page-scroll" style="max-width:800px;margin:0 auto;">
@@ -605,15 +669,15 @@
           </div>
           <div class="form-group" style="margin-bottom:16px;">
             <label style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:block;" data-i18n="register.emailProvider">邮箱提供商</label>
-            <div style="display:flex;gap:8px;">
-              <label style="flex:1;display:flex;align-items:center;justify-content:center;padding:10px;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all 0.2s;" onclick="selectEmailProvider('outlook')">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <label style="flex:1 1 150px;display:flex;align-items:center;justify-content:center;padding:10px;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all 0.2s;" onclick="selectEmailProvider('outlook')">
                 <input type="radio" name="email-provider" value="outlook" checked style="display:none;">
                 <div id="provider-outlook" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);">
                   <img src="assets/outlook.png" style="width:20px;height:20px;border-radius:4px;">
                   <span data-i18n="register.outlook">微软邮箱</span>
                 </div>
               </label>
-              <label style="flex:1;display:flex;align-items:center;justify-content:center;padding:10px;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all 0.2s;" onclick="selectEmailProvider('moemail')">
+              <label style="flex:1 1 150px;display:flex;align-items:center;justify-content:center;padding:10px;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all 0.2s;" onclick="selectEmailProvider('moemail')">
                 <input type="radio" name="email-provider" value="moemail" style="display:none;">
                 <div id="provider-moemail" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);">
                   <svg viewBox="0 0 32 32" width="20" height="20" fill="none" style="color:#8b5cf6;">
@@ -627,13 +691,23 @@
                   <span>MoeMail</span>
                 </div>
               </label>
-              <label style="flex:1;display:flex;align-items:center;justify-content:center;padding:10px;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all 0.2s;" onclick="selectEmailProvider('cloudmail')">
+              <label style="flex:1 1 150px;display:flex;align-items:center;justify-content:center;padding:10px;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all 0.2s;" onclick="selectEmailProvider('cloudmail')">
                 <input type="radio" name="email-provider" value="cloudmail" style="display:none;">
                 <div id="provider-cloudmail" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);">
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/>
                   </svg>
                   <span data-i18n="register.cloudmail">Cloud-Mail</span>
+                </div>
+              </label>
+              <label style="flex:1 1 150px;display:flex;align-items:center;justify-content:center;padding:10px;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all 0.2s;" onclick="selectEmailProvider('mailmanager')">
+                <input type="radio" name="email-provider" value="mailmanager" style="display:none;">
+                <div id="provider-mailmanager" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16v16H4z"/>
+                    <path d="M4 7l8 6 8-6"/>
+                  </svg>
+                  <span data-i18n="register.mailmanager">Mail Manager</span>
                 </div>
               </label>
             </div>
@@ -669,6 +743,19 @@
               <div id="cfg-cloudmail-domains-list" class="moemail-domains-container">
                 <div style="text-align:center;color:var(--text-muted);font-size:12px;padding:12px;" data-i18n="common.loading">加载中...</div>
               </div>
+            </div>
+          </div>
+
+          <!-- Mail Manager 类型选择 -->
+          <div id="mailmanager-config-select" style="display:none;margin-bottom:16px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;display:block;" data-i18n="register.mailmanagerType">邮箱类型</label>
+              <select id="mailmanager-provider-type" class="form-input" style="height:38px;">
+                <option value="hotmail">hotmail</option>
+                <option value="icloud">icloud</option>
+                <option value="cf_gmail">cf_gmail</option>
+                <option value="manual">manual</option>
+              </select>
             </div>
           </div>
 
@@ -957,6 +1044,7 @@
 <script src="js/task.js"></script>
 <script src="js/overview.js"></script>
 <script src="js/subscription.js"></script>
+<script src="js/kiro_cli.js"></script>
 <script src="js/proxy_pool.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/app.js"></script>

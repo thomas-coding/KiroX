@@ -104,6 +104,7 @@ export namespace task {
 	    cloudmailDomains: string[];
 	    cloudmailConfigs: Record<string, Array<email.CloudMailConfig>>;
 	    cloudmailRandomMode: boolean;
+	    mailManagerProvider: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new StartTaskRequest(source);
@@ -122,6 +123,7 @@ export namespace task {
 	        this.cloudmailDomains = source["cloudmailDomains"];
 	        this.cloudmailConfigs = this.convertValues(source["cloudmailConfigs"], Array<email.CloudMailConfig>, true);
 	        this.cloudmailRandomMode = source["cloudmailRandomMode"];
+	        this.mailManagerProvider = source["mailManagerProvider"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

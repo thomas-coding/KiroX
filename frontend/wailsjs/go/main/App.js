@@ -30,12 +30,20 @@ export function ClearRegisteredOutlookAccounts() {
   return window['go']['main']['App']['ClearRegisteredOutlookAccounts']();
 }
 
+export function DeleteKiroCliAccount(arg1) {
+  return window['go']['main']['App']['DeleteKiroCliAccount'](arg1);
+}
+
 export function DeleteOutlookAccount(arg1) {
   return window['go']['main']['App']['DeleteOutlookAccount'](arg1);
 }
 
 export function DeleteProxyEntry(arg1) {
   return window['go']['main']['App']['DeleteProxyEntry'](arg1);
+}
+
+export function DeleteSuspendedKiroCliAccounts(arg1) {
+  return window['go']['main']['App']['DeleteSuspendedKiroCliAccounts'](arg1);
 }
 
 export function DetectProxy(arg1) {
@@ -86,6 +94,10 @@ export function GetProxy() {
   return window['go']['main']['App']['GetProxy']();
 }
 
+export function GetRegisterLogPath() {
+  return window['go']['main']['App']['GetRegisterLogPath']();
+}
+
 export function GetResultOutputDir() {
   return window['go']['main']['App']['GetResultOutputDir']();
 }
@@ -106,12 +118,24 @@ export function GetTaskStatus() {
   return window['go']['main']['App']['GetTaskStatus']();
 }
 
+export function ImportKiroCliAccount(arg1) {
+  return window['go']['main']['App']['ImportKiroCliAccount'](arg1);
+}
+
 export function ImportOutlookFile(arg1) {
   return window['go']['main']['App']['ImportOutlookFile'](arg1);
 }
 
+export function KiroCliStartCommand() {
+  return window['go']['main']['App']['KiroCliStartCommand']();
+}
+
 export function ListProxyPool() {
   return window['go']['main']['App']['ListProxyPool']();
+}
+
+export function LoadKiroCliAccounts() {
+  return window['go']['main']['App']['LoadKiroCliAccounts']();
 }
 
 export function LoadOutputAccounts() {
@@ -124,6 +148,10 @@ export function LogoutLicense() {
 
 export function OpenURL(arg1) {
   return window['go']['main']['App']['OpenURL'](arg1);
+}
+
+export function PrecheckKiroCliAccount(arg1) {
+  return window['go']['main']['App']['PrecheckKiroCliAccount'](arg1);
 }
 
 export function ResetDataDir() {

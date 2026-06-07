@@ -38,6 +38,10 @@ type Config struct {
 	CloudMailConfig   *email.CloudMailConfig
 	CloudMailProvider *email.CloudMailProvider
 
+	UseMailManager          bool
+	MailManagerProvider     *email.MailManagerProvider
+	MailManagerProviderType string
+
 	MoEmailBaseURL string
 	MoEmailAPIKey  string
 }
@@ -83,4 +87,3 @@ func GenPassword() string {
 	rand.Shuffle(len(pw), func(i, j int) { pw[i], pw[j] = pw[j], pw[i] })
 	return string(pw)
 }
-
